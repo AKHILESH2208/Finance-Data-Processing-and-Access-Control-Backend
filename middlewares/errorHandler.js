@@ -4,7 +4,7 @@ export const errorHandler = (err, req, res, next) => {
   // Catch those Zod validation errors so they don't hit the DB quietly
   if (err.name === 'ZodError') {
     return res.status(400).json({ 
-      error: "Validation failed. Double check your payload!", 
+      error: "Invalid request payload format or parameters.", 
       issues: err.errors 
     });
   }
@@ -12,7 +12,7 @@ export const errorHandler = (err, req, res, next) => {
   // grab a specific status if set, otherwise default to 500 error block
   const statusCode = err.statusCode || 500;
   
-  const errorMessage = err.message || "Yikes, something unexpected crashed on the server.";
+  const errorMessage = err.message || "An unexpected internal server error occurred.";
 
   res.status(statusCode).json({
     error: errorMessage,
