@@ -1,0 +1,55 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Test Runner",
+			"type": "shell",
+			"command": "node index.js & SERVER_PID=$!; sleep 2; node run_tests2.js; kill $SERVER_PID"
+		},
+		{
+			"label": "Test Server Boot",
+			"type": "shell",
+			"command": "node index.js"
+		},
+		{
+			"label": "Test Runner 2",
+			"type": "shell",
+			"command": "node index.js & SERVER_PID=$!; sleep 2; node run_tests2.js; kill $SERVER_PID"
+		},
+		{
+			"label": "Test Output",
+			"type": "shell",
+			"command": "node index.js & SERVER_PID=$!; sleep 2; node run_tests2.js > test_output.txt; kill $SERVER_PID"
+		},
+		{
+			"label": "DB Push",
+			"type": "shell",
+			"command": "npx prisma db push"
+		},
+		{
+			"label": "Run Tests Correctly",
+			"type": "shell",
+			"command": "node index.js & SERVER_PID=$!; sleep 1; node run_tests2.js > test_output.txt; kill $SERVER_PID"
+		},
+		{
+			"label": "Show Test Output",
+			"type": "shell",
+			"command": "cat test_output.txt"
+		},
+		{
+			"label": "Show full output",
+			"type": "shell",
+			"command": "cat test_output.txt"
+		},
+		{
+			"label": "Run Tests With Error output",
+			"type": "shell",
+			"command": "node index.js & SERVER_PID=$!; sleep 1; node run_tests2.js > test_output.txt; kill $SERVER_PID"
+		},
+		{
+			"label": "Run Tests With Fix",
+			"type": "shell",
+			"command": "node index.js & SERVER_PID=$!; sleep 1; node run_tests2.js > test_output.txt; kill $SERVER_PID"
+		}
+	]
+}
