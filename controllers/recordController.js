@@ -4,10 +4,10 @@ import { createRecordSchema } from "../validations/schemas.js";
 
 export const createRecord = async (req, res, next) => {
   try {
-    // Strictly validate negative amount and future date requirements per Zod
+    // We lean on Zod to catch negative amounts or future dates before we do any heavy lifting
     const { amount, type, category, date, notesEncrypted } = createRecordSchema.parse(req.body);
 
-    // securely encrypting the vulnerable float data
+    // Securely encrypt the vulnerable float data using AES-256-GCM
     const encryptedResult = encryptData(amount.toString());
     
     const record = await prisma.record.create({
@@ -36,24 +36,32 @@ export const createRecord = async (req, res, next) => {
 
 export const getRecords = async (req, res, next) => {
   try {
-    // pagination defaults
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 100;
+    // Grab pagination values and ensure they stay within reasonable bounds to prevent memory blowouts (max 1000)
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 100));
 
-    // Destructure dynamic filter options from query params
+    // Pull our filter options right from the query parameters
     const { type, category, startDate, endDate } = req.query;
     
-    // Build dynamically verified filter constraints
+    // Set up our flexible 'where' clause for Prisma
     const filterQuery = {};
+    
+    // Apply exact string matches if the user asked for them
     if (type) filterQuery.type = type;
     if (category) filterQuery.category = category;
+    
+    // Safely parse date boundaries so Prisma doesn't crash on garbage text
     if (startDate || endDate) {
       filterQuery.date = {};
-      if (startDate) filterQuery.date.gte = new Date(startDate);
-      if (endDate) filterQuery.date.lte = new Date(endDate);
+      if (startDate && !isNaN(new Date(startDate).getTime())) {
+        filterQuery.date.gte = new Date(startDate);
+      }
+      if (endDate && !isNaN(new Date(endDate).getTime())) {
+        filterQuery.date.lte = new Date(endDate);
+      }
     }
     
-    // fetching the raw ciphertexts strictly adhering to filter criteria
+    // Fetch only what we need from the database
     const records = await prisma.record.findMany({ 
       where: filterQuery,
       skip: (page - 1) * limit, 
@@ -61,7 +69,7 @@ export const getRecords = async (req, res, next) => {
       orderBy: { date: "desc" } 
     });
     
-    // mapping out and dynamically reconstructing the plaintext
+    // Loop through the ciphertexts and decipher them back into human-readable floats
     const securedRecords = records.map(r => ({ 
       id: r.id, 
       amount: parseFloat(decryptData(r.amountEncrypted, r.iv, r.authTag)), 
@@ -87,15 +95,16 @@ export const getRecords = async (req, res, next) => {
 
 export const getSummary = async (req, res, next) => {
   try {
+    // For a summary, we need to crunch everything. In a larger app, we might cache this in Redis.
     const records = await prisma.record.findMany();
     
     let totalIncome = 0;
     let totalExpenses = 0; 
     let categoryAnalysis = {};
     
-    // crunch the numbers
+    // Walk through and compile the analytics
     for (const r of records) {
-      // decipher it on the fly
+      // Decrypt the value on the fly
       const decryptedAmount = parseFloat(decryptData(r.amountEncrypted, r.iv, r.authTag)) || 0;
       
       if (r.type === "INCOME") {
@@ -104,12 +113,8 @@ export const getSummary = async (req, res, next) => {
         totalExpenses += decryptedAmount;
       }
 
-      // tally up the category bins
-      if (categoryAnalysis[r.category]) {
-         categoryAnalysis[r.category] += decryptedAmount;
-      } else {
-         categoryAnalysis[r.category] = decryptedAmount;
-      }
+      // Tally up the category buckets, initializing to 0 if it's new
+      categoryAnalysis[r.category] = (categoryAnalysis[r.category] || 0) + decryptedAmount;
     }
     
     res.json({ 
@@ -126,8 +131,8 @@ export const getSummary = async (req, res, next) => {
 };
 
 export const deleteRecord = async (req, res, next) => {
+  // Simply yank the record entirely out of the database based on the ID param
   try { 
-    // simply yank it out of the db
     await prisma.record.delete({ 
       where: { id: req.params.id } 
     }); 
