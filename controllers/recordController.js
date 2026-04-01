@@ -39,9 +39,23 @@ export const getRecords = async (req, res, next) => {
     // pagination defaults
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 100;
+
+    // Destructure dynamic filter options from query params
+    const { type, category, startDate, endDate } = req.query;
     
-    // fetching the raw ciphertexts
+    // Build dynamically verified filter constraints
+    const filterQuery = {};
+    if (type) filterQuery.type = type;
+    if (category) filterQuery.category = category;
+    if (startDate || endDate) {
+      filterQuery.date = {};
+      if (startDate) filterQuery.date.gte = new Date(startDate);
+      if (endDate) filterQuery.date.lte = new Date(endDate);
+    }
+    
+    // fetching the raw ciphertexts strictly adhering to filter criteria
     const records = await prisma.record.findMany({ 
+      where: filterQuery,
       skip: (page - 1) * limit, 
       take: limit, 
       orderBy: { date: "desc" } 

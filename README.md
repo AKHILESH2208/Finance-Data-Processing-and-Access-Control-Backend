@@ -159,6 +159,7 @@ Then let the platform natively fire `npm start` to execute `node index.js`.
 
 #### 2. Retrieve All Records
 - **Path:** `GET /api/records`
+- **Query Params (Optional for filtering):** `?category=Consulting`, `?type=INCOME`, `?startDate=2026-01-01`, `?endDate=2026-12-31`, `?page=1&limit=100`
 - **Access:** `ADMIN`, `ANALYST`, `VIEWER`
 - **Returns:** `200 OK` array of all decrypted human-readable records safely reconstructed from PostgreSQL.
 
