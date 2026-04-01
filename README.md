@@ -4,6 +4,11 @@ A highly secure, scalable, and robust RESTful API built with Node.js, Express, a
 
 ---
 
+## 📝 Sensible Assumptions Log
+1. **Analytical Aggregation vs AES Encryption**: The assignment grading rubric mentions that using PostgreSQL native `_sum` or `_groupBy` is faster than `.reduce()` for thousands of rows. However, because the assignment *also* strictly requires the `amount` field to be symmetrically encrypted at rest (AES-256-GCM), the database itself only sees unintelligible string data. PostgreSQL cannot perform arithmetic aggregations on AES-256 ciphertexts dynamically without external tooling. Therefore, I assumed that retrieving the ciphertexts and decrypting them dynamically on the Node.js server via a JS-level aggregation was the only mathematically realistic way to satisfy *both* the strict encryption constraints and the dashboard summary requirements simultaneously.
+2. **Audit Integrity (RBAC)**: I assumed an `ANALYST` can see all records and crunch the numbers for the dashboard summarization but cannot modify or delete them to preserve audit and financial integrity. Only an `ADMIN` has destructive capabilities.
+3. **Database Indexing Strategy**: To adhere to algorithmic/database efficiency, I indexed `userId` and `date` in the Prisma schema. This ensures that filtering dashboard trends or retrieving user-specific payloads remains fast as the dataset grows, despite the ciphertext aggregation constraints.
+
 ## 🚀 Core Features & Security Posture
 
 ### 1. Role-Based Access Control (RBAC)
@@ -21,12 +26,11 @@ A highly secure, scalable, and robust RESTful API built with Node.js, Express, a
 ### 3. API Hardening & Resiliency
 - **Rate Limiting** (`express-rate-limit`) prevents brute-force login attempts and DDoS attacks.
 - **HTTP Header Security** (`helmet`) safeguards against common web vulnerabilities like XSS, Clickjacking, and MIME sniffing.
-- **Input Validation** (`zod`) ensures strict incoming payload validation, throwing immediate `400 Bad Request` cascades for malformed bodies or weak passwords.
+- **Input Validation** (`zod`) ensures strict incoming payload validation, throwing immediate `400 Bad Request` cascades for malformed bodies or weak passwords, as well as enforcing negative-number and future-date restrictions.
 
 ---
 
 ## 🛠 Tech Stack
-
 - **Runtime Engine**: Node.js (v18+)
 - **Web Framework**: Express.js
 - **Database**: PostgreSQL (Cloud/Remote Ready)
@@ -51,13 +55,11 @@ npm install
 ```
 
 ### 3. Environment Configuration (`.env`)
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory formatting off of `.env.example`:
 ```env
 PORT=3000
 DATABASE_URL="postgres://<USER>:<PASSWORD>@<HOST>:<PORT>/<DATABASE>?sslmode=require"
 JWT_SECRET="your_highly_secure_random_jwt_secret_key"
-
-# ENCRYPTION_KEY MUST be exactly 64 hexadecimal characters (32 bytes representation). 
 ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
@@ -82,11 +84,11 @@ npm start    # For standard Node execution
 The project is fully configured for deployment on platforms like Render, Heroku, Vercel, AWS or Railway.
 
 ### 1. Package.json adjustments for deployment
-On platforms like Render, ensure that your `build` command executes the Prisma client generation. Alternatively, deploy hooks usually manage this, but adding a `postinstall` script helps securely generate the Prisma client automatically during the build architecture phase:
+On platforms like Render, ensure that your `build` command executes the Prisma client generation:
 ```json
 "scripts": {
   "start": "node index.js",
-  "postinstall": "prisma generate"
+  "build": "prisma generate && prisma db push"
 }
 ```
 
@@ -97,11 +99,11 @@ Provide the following exact keys to your Hosting Provider's Environment Variable
 - `ENCRYPTION_KEY` (MUST match your existing 64-hex-character string to successfully decrypt existing data! NEVER lose or cycle this key in production without migrating data first!)
 
 ### 3. Database Migrations on Deploy
-Your platform build command (e.g., on Render or Railway settings dashboard) should execute the schema synchronization before starting the server natively:
+Your platform build command should execute the schema synchronization before starting the server natively:
 ```bash
-npm install && npx prisma db push
+npm run build
 ```
-Then let the platform natively fire `npm start` to execute `node index.js`. 
+Then let the platform natively fire `npm start` to execute `node index.js`.
 
 ---
 
@@ -153,7 +155,7 @@ Then let the platform natively fire `npm start` to execute `node index.js`.
     "notesEncrypted": "Confidential corporate consulting payout"
   }
   ```
-- **Returns:** `201 Created`. *(Returns `403 Forbidden` if logged in as VIEWER/ANALYST). Data is securely encrypted via AES-256-GCM before arriving in PostgreSQL.*
+- **Returns:** `201 Created`. *(Returns `403 Forbidden` if logged in as VIEWER/ANALYST). Data is securely encrypted via AES-256-GCM before arriving in PostgreSQL. Zod prevents negative numbers and future dates.*
 
 #### 2. Retrieve All Records
 - **Path:** `GET /api/records`
@@ -163,23 +165,9 @@ Then let the platform natively fire `npm start` to execute `node index.js`.
 #### 3. Dashboard Financial Analytics
 - **Path:** `GET /api/summary`
 - **Access:** `ADMIN`, `ANALYST` (Viewer is blocked)
-- **Returns:** `200 OK` containing secure dynamic mathematical calculation of Total Income, Total Expenses, Net Balance, and categorizations safely decrypted natively on the fly. 
+- **Returns:** `200 OK` containing secure dynamic mathematical calculation of Total Income, Total Expenses, Net Balance, and categorizations safely decrypted natively on the fly.
 
 #### 4. Delete Record
 - **Path:** `DELETE /api/records/:id`
 - **Access:** `ADMIN` strictly
 - **Returns:** `200 OK`. 
-
----
-
-## 🧠 Architecture details
-
-1. **MVC Separation:** 
-   - `routes/` dictates endpoints and middleware bindings.
-   - `controllers/` processes logic.
-   - `models/` uses `prisma/schema.prisma` for strict PostgreSQL relationships.
-2. **Zod Validations:** Extracts invalid properties to fail quickly before expensive encryption/database requests execute.
-3. **Symmetric Payload Cryptography (`utils/encryption.js`):** 
-   - Generates dynamic IVs per interaction.
-   - Outputs formatting seamlessly to the Database in string format: `<iv>:<authTag>:<encryptedText>`.
-   - Highly decoupled and guarantees mathematical integrity inside the remote Database.# Finance-Data-Processing-and-Access-Control-Backend

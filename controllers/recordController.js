@@ -1,14 +1,11 @@
 import { encryptData, decryptData } from "../utils/encryption.js";
 import prisma from "../models/db.js";
+import { createRecordSchema } from "../validations/schemas.js";
 
 export const createRecord = async (req, res, next) => {
   try {
-    const { amount, type, category, date, notesEncrypted } = req.body;
-    
-    // quick sanity check
-    if (!amount || !type || !category || !date) {
-      return res.status(400).json({ error: "Missing some required fields over here!" });
-    }
+    // Strictly validate negative amount and future date requirements per Zod
+    const { amount, type, category, date, notesEncrypted } = createRecordSchema.parse(req.body);
 
     // securely encrypting the vulnerable float data
     const encryptedResult = encryptData(amount.toString());
