@@ -1,4 +1,4 @@
-# 🏦 Zorvyn Secure Finance Dashboard Backend
+# 🏦 Finance Data Processing and Access Control Backend
 
 A highly secure, scalable, and robust RESTful API built with Node.js, Express, and PostgreSQL to manage and analyze financial records. This application is architected around Role-Based Access Control (RBAC) and military-grade AES-256-GCM encryption, ensuring that sensitive financial data remains strictly confidential and immutable to unauthorized actors. It is natively backed by **PostgreSQL**, making it 100% production and deployment ready!
 
